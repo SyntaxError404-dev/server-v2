@@ -9,8 +9,8 @@ app.use(cors());
 
 app.get('/ques', async (req, res) => {
   try {
-    const t = req.query.t
-    const response = await axios.get(`https://gemini-ai-pearl-two.vercel.app/kshitiz?prompt=${t}`);
+    const t = req.query.t;
+    const response = await axios.get(`https://www.samirxpikachu.run.place/multi/Ml?prompt=${t}&model=MythoMax-L2-13b`);
 
     res.json(response.data.message);
   } catch (error) {
@@ -19,4 +19,6 @@ app.get('/ques', async (req, res) => {
   }
 });
 
-app.listen(port, () => {});
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
