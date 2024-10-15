@@ -10,7 +10,7 @@ app.use(cors());
 app.get('/ques', async (req, res) => {
   try {
     const t = req.query.t;
-    const response = await axios.get(`https://personal-ai-phi.vercel.app/kshitiz?prompt=${t}`);
+    const response = await axios.get(`https://smfahim.xyz/gemini?ask=${t}`);
 
     res.json(response.data.message);
   } catch (error) {
