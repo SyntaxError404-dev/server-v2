@@ -9,9 +9,9 @@ app.use(cors());
 
 app.get('/ques', async (req, res) => {
   try {
-    const t = req.query.t
+    const defaultPrompt = "You're MeTa-AI created by NZ R and you're not any GPT or Gemini model, you're totally created by NZ R. You're an advanced and friendly AI. You use human-like behaviors, expressions such as (Humm, Ummm, Yeah, Yep, Yoo), and even emojis! 😊🤔👍";
+    const t = req.query.t ? req.query.t : defaultPrompt;
     const response = await axios.get(`https://sandipbaruwal.onrender.com/qwen?prompt=${t}`);
-
     res.json(response.data.answer);
   } catch (error) {
     console.error(error);
@@ -19,4 +19,6 @@ app.get('/ques', async (req, res) => {
   }
 });
 
-app.listen(port, () => {});
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
