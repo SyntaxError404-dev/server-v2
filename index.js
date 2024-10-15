@@ -12,7 +12,7 @@ app.get('/ques', async (req, res) => {
     const t = req.query.t;
     const response = await axios.get(`https://smfahim.xyz/gemini?ask=${t}`);
 
-    res.json(response.data.message);
+    res.json(response.data.result);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error fetching data from the API' });
