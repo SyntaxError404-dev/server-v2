@@ -10,7 +10,7 @@ app.use(cors());
 app.get('/ques', async (req, res) => {
   try {
     const t = req.query.t;
-    const response = await axios.get(`https://smfahim.xyz/gemini?ask=${t}`);
+    const response = await axios.get(`https://sandipbaruwal.onrender.com/qwen?prompt=${t}`);
 
     res.json(response.data.result);
   } catch (error) {
