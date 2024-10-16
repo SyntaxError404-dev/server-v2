@@ -12,7 +12,7 @@ app.get('/ques', async (req, res) => {
     const t = req.query.t;
     const response = await axios.get(`https://sandipbaruwal.onrender.com/qwen?prompt=${t}`);
 
-    res.json(response.data.result);
+    res.json(response.data.answer);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error fetching data from the API' });
