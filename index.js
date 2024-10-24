@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const port = 3000;
@@ -10,7 +11,9 @@ app.use(cors());
 app.get('/ques', async (req, res) => {
   try {
     const t = req.query.t;
-    const response = await axios.get(`https://sandipbaruwal.onrender.com/qwen?prompt=${t}`);
+    const apiUrl = `https://www.samirxpikachu.run.place/bing?query=${t}&mode=bing&uid=${uuidv4()}`;
+
+    const response = await axios.get(apiUrl);
 
     res.json(response.data.answer);
   } catch (error) {
