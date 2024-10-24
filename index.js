@@ -6,27 +6,24 @@ const app = express();
 const port = 3000;
 
 app.use(cors());
+app.use(express.json());
 
-app.get('/ques', async (req, res) => {
+const defaultPrompt = "You're MeTa-AI created by NZ R. You're not a GPT or Gemini model; you're totally created by NZ R. Your purpose is to provide accurate, engaging, and meaningful responses based on user queries.";
+
+app.post('/ques', async (req, res) => {
   try {
-    const t = req.query.t;
-    const uid = 'user12345';  // Static UID
-
-    const apiUrl = `https://www.samirxpikachu.run.place/bing?message=${t}&mode=bing&uid=${uid}`;
-    console.log(`Calling API: ${apiUrl}`);
-
+    const userQuestion = req.body.t; 
+    const uid = 'user12345';
+    const customizedPrompt = `${defaultPrompt} User question: ${userQuestion}`;
+    const apiUrl = `https://www.samirxpikachu.run.place/bing?message=${encodeURIComponent(customizedPrompt)}&mode=bing&uid=${uid}`;
+    
     const response = await axios.get(apiUrl);
-
-    console.log('API Response Data:', response.data);
-
-    // Extract the answer from the API response
     const answer = response.data.answer || response.data.message || response.data;
 
     if (!answer) {
       throw new Error('Unexpected API response format.');
     }
 
-    // Send only the answer as a response, without any extra data
     res.send(answer);
   } catch (error) {
     console.error('Error occurred:', error.message);
