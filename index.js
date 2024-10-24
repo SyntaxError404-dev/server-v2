@@ -11,7 +11,7 @@ app.use(cors());
 app.get('/ques', async (req, res) => {
   try {
     const t = req.query.t;
-    const apiUrl = `https://www.samirxpikachu.run.place/bing?query=${t}&mode=bing&uid=${uuidv4()}`;
+    const apiUrl = `https://www.samirxpikachu.run.place/bing?message=${t}&mode=bing&uid=${uuidv4()}`;
 
     const response = await axios.get(apiUrl);
 
