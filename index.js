@@ -8,36 +8,30 @@ const port = 3000;
 
 app.use(cors());
 
-const generateUid = () => uuidv4();
-
 app.get('/ques', async (req, res) => {
   try {
     const t = req.query.t;
-    const uid = generateUid();
+    const uid = uuidv4();
 
     const apiUrl = `https://www.samirxpikachu.run.place/bing?message=${t}&mode=bing&uid=${uid}`;
-    console.log(`Calling API: ${apiUrl}`);  // Log the API URL
+    console.log(`Calling API: ${apiUrl}`);
 
     const response = await axios.get(apiUrl);
 
-    // Log the response data for debugging
     console.log('API Response Data:', response.data);
 
-    // Check if the expected structure of the response has a 'message' or other key
-    const message = response.data.message || response.data.answer || response.data; 
+    // Assuming the response contains the answer in response.data.answer
+    const answer = response.data.answer || response.data.message || response.data;
 
-    // If message is undefined, provide a fallback error message
-    if (!message) {
+    if (!answer) {
       throw new Error('Unexpected API response format.');
     }
 
-    res.json({
-      uid: uid,
-      answer: message, // Return the message from the API response
-    });
+    // Send only the answer as a response, without any extra data like UID
+    res.send(answer);
   } catch (error) {
     console.error('Error occurred:', error.message);
-    res.status(500).json({ error: 'Error fetching data from the API' });
+    res.status(500).send('Error fetching data from the API');
   }
 });
 
