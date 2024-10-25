@@ -6,33 +6,41 @@ const app = express();
 const port = 3000;
 
 app.use(cors());
+app.use(express.json());
 
-app.use((req, res, next) => {
-  const t = req.query.t;
-  const prompt = `
-    You're MeTa-AI, an advanced AI assistant created by NZ R. 
-    You're not a GPT or Gemini model, you're completely crafted by NZ R. 
-    Engage with the following input: ${t}
-  `;
-  req.query.modifiedPrompt = prompt;
-  next();
-});
+// Configuration for your AI assistant
+const assistantConfig = {
+  name: "MeTa-AI",
+  creator: "NZ R",
+  description: "You're MeTa-AI created by NZ R. You're not a GPT or Gemini model; you're totally created by NZ R.",
+  defaultRole: "Your role is to provide accurate and engaging responses with a unique tone that aligns with user preferences.",
+};
 
-app.get('/ques', async (req, res) => {
+// Function to generate the full prompt for the assistant
+const generatePrompt = (question, tone) => {
+  const { name, creator, description, defaultRole } = assistantConfig;
+  return `${description} You were created by ${creator}. Respond in a ${tone} manner to the following question: ${question}. ${defaultRole}`;
+};
+
+app.post('/ques', async (req, res) => {
   try {
-    const modifiedPrompt = req.query.modifiedPrompt;
+    const { t: question, tone } = req.body;
     const uid = 'user12345';
 
-    const apiUrl = `https://www.samirxpikachu.run.place/bing?message=${encodeURIComponent(modifiedPrompt)}&mode=bing&uid=${uid}`;
+    // Generate the customized prompt using the assistant's configuration
+    const customizedPrompt = generatePrompt(question, tone);
+    const apiUrl = `https://www.samirxpikachu.run.place/bing?message=${encodeURIComponent(customizedPrompt)}&mode=bing&uid=${uid}`;
+    
     const response = await axios.get(apiUrl);
-
     const answer = response.data.answer || response.data.message || response.data;
+
     if (!answer) {
       throw new Error('Unexpected API response format.');
     }
 
     res.send(answer);
   } catch (error) {
+    console.error('Error occurred:', error.message);
     res.status(500).send('Error fetching data from the API');
   }
 });
