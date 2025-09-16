@@ -1,17 +1,20 @@
 {
-  "name": "mj-proxy-server",
+  "name": "mj-express-host",
   "version": "1.0.0",
-  "description": "Express server to generate images using Midjourney proxy API",
+  "description": "Express host for Midjourney-style image generation with grid and individual image retrieval",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "axios": "^1.7.4",
-    "express": "^4.19.2"
+    "axios": "^1.6.8",
+    "express": "^4.19.2",
+    "sharp": "^0.33.3",
+    "uuid": "^9.0.1"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "author": "NZ R"
 }
