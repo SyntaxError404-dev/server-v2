@@ -1,59 +1,84 @@
 const express = require("express");
 const axios = require("axios");
-const stream = require("stream");
-const { promisify } = require("util");
+const fs = require("fs");
+const path = require("path");
+const sharp = require("sharp");
+const { v4: uuidv4 } = require("uuid");
 
-const pipeline = promisify(stream.pipeline);
 const app = express();
+const PORT = process.env.PORT || 3000;
+const baseDir = path.join(__dirname, "jobs");
+if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir);
 
 app.get("/mj", async (req, res) => {
+  const prompt = (req.query.prompt || "").trim();
+  if (!prompt) return res.status(400).json({ error: "dhon..! prompt gib korun..🫴" });
+
+  const jobId = uuidv4();
+  const jobDir = path.join(baseDir, jobId);
+  fs.mkdirSync(jobDir);
+
+  const apiUrl = `https://api.oculux.xyz/api/mj-proxy-pub?prompt=${encodeURIComponent(prompt)}&usePolling=false`;
   try {
-    const prompt = (req.query.prompt || "").trim();
-    if (!prompt) return res.status(400).json({ error: "dhon..! prompt gib korun..🫴" });
+    const response = await axios.get(apiUrl, { timeout: 180000 });
+    const urls = response.data.results;
+    if (!urls || urls.length === 0) return res.status(500).json({ error: "No images generated" });
 
-    const apiUrl = `https://api.oculux.xyz/api/mj-proxy-pub?prompt=${encodeURIComponent(
-      prompt
-    )}&usePolling=false`;
-
-    const upstream = await axios.get(apiUrl, { responseType: "arraybuffer", timeout: 180000, validateStatus: null });
-    const upstreamType = (upstream.headers["content-type"] || "").toLowerCase();
-
-    if (upstreamType.startsWith("image/")) {
-      res.setHeader("content-type", upstreamType);
-      res.setHeader("cache-control", "no-cache, no-store, must-revalidate");
-      return res.send(Buffer.from(upstream.data));
+    const bufs = [];
+    const paths = [];
+    for (let i = 0; i < urls.length; i++) {
+      const r = await axios.get(urls[i], { responseType: "arraybuffer" });
+      const file = path.join(jobDir, `img${i + 1}.png`);
+      fs.writeFileSync(file, r.data);
+      bufs.push(Buffer.from(r.data));
+      paths.push(file);
     }
 
-    if (upstreamType.includes("application/json") || upstreamType.includes("text/json") || upstreamType.includes("application/problem+json")) {
-      let json;
-      try {
-        json = JSON.parse(Buffer.from(upstream.data).toString("utf8"));
-      } catch (e) {
-        return res.status(500).json({ error: "Failed to parse upstream JSON" });
-      }
+    const dims = await sharp(bufs[0]).metadata();
+    const gridWidth = dims.width * 2;
+    const gridHeight = dims.height * 2;
+    const cellWidth = dims.width;
+    const cellHeight = dims.height;
 
-      const candidate =
-        (Array.isArray(json.results) && json.results.length && json.results[0]) ||
-        json.url ||
-        json.image ||
-        json.data ||
-        null;
+    const gridBuf = await sharp({
+      create: { width: gridWidth, height: gridHeight, channels: 3, background: { r: 0, g: 0, b: 0 } },
+    })
+      .composite(
+        bufs.map((input, i) => ({
+          input,
+          left: (i % 2) * cellWidth,
+          top: Math.floor(i / 2) * cellHeight,
+        }))
+      )
+      .png()
+      .toBuffer();
 
-      if (!candidate) return res.status(502).json({ error: "Upstream returned JSON but no image URL found" });
+    const gridPath = path.join(jobDir, "grid.png");
+    fs.writeFileSync(gridPath, gridBuf);
 
-      const imageResp = await axios.get(candidate, { responseType: "stream", timeout: 180000, validateStatus: null });
-      const imageType = (imageResp.headers["content-type"] || "application/octet-stream").toLowerCase();
-      res.setHeader("content-type", imageType);
-      res.setHeader("cache-control", "no-cache, no-store, must-revalidate");
-      await pipeline(imageResp.data, res);
-      return;
-    }
-
-    return res.status(502).json({ error: "Unsupported upstream response", headers: upstream.headers });
-  } catch (err) {
-    return res.status(500).json({ error: "dhon er midjourney error", message: err.message });
+    res.json({ jobId, message: "Job created. Use /mj?id=" + jobId + " to fetch grid or /mj?getimg=1-4&id=" + jobId + " for individual." });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to generate images" });
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {});
+app.get("/mj", async (req, res) => {
+  const { id, getimg } = req.query;
+  if (!id) return res.status(400).json({ error: "Missing job ID" });
+  const jobDir = path.join(baseDir, id);
+  if (!fs.existsSync(jobDir)) return res.status(404).json({ error: "Job not found" });
+
+  if (!getimg) {
+    const gridPath = path.join(jobDir, "grid.png");
+    if (!fs.existsSync(gridPath)) return res.status(404).json({ error: "Grid not found" });
+    return res.sendFile(gridPath);
+  }
+
+  const index = parseInt(getimg);
+  if (isNaN(index) || index < 1 || index > 4) return res.status(400).json({ error: "Invalid image index" });
+  const imgPath = path.join(jobDir, `img${index}.png`);
+  if (!fs.existsSync(imgPath)) return res.status(404).json({ error: "Image not found" });
+  return res.sendFile(imgPath);
+});
+
+app.listen(PORT, () => console.log(`MJ host running on ${PORT}`));
