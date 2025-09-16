@@ -1,17 +1,17 @@
 {
-  "name": "custom-api-server",
+  "name": "mj-proxy-server",
   "version": "1.0.0",
-  "description": "A custom API server that fetches data from an external API with random UID generation",
+  "description": "Express server to generate images using Midjourney proxy API",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node server.js"
   },
-  "author": "NZ R",
-  "license": "MIT",
   "dependencies": {
-    "axios": "^1.4.0",
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "uuid": "^9.0.0"
-  }
+    "axios": "^1.7.4",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
 }
