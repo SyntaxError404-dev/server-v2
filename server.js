@@ -1,129 +1,59 @@
-const express = require('express');
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const sharp = require('sharp');
+const express = require("express");
+const axios = require("axios");
+const stream = require("stream");
+const { promisify } = require("util");
 
+const pipeline = promisify(stream.pipeline);
 const app = express();
-const port = process.env.PORT || 3000;
-const imagesDir = path.join(__dirname, 'images');
 
-if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir);
-
-const cleanupFiles = async (files) => {
-  for (const file of files) {
-    try {
-      if (fs.existsSync(file)) await fs.promises.unlink(file);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-};
-
-const autoCleanupFolder = async () => {
+app.get("/mj", async (req, res) => {
   try {
-    if (!fs.existsSync(imagesDir)) return;
-    const now = Date.now();
-    for (const f of fs.readdirSync(imagesDir)) {
-      const file = path.join(imagesDir, f);
-      if (now - fs.statSync(file).mtime.getTime() > 30 * 60 * 1000) await fs.promises.unlink(file);
-    }
-  } catch (e) {
-    console.error(e);
-  }
-};
+    const prompt = (req.query.prompt || "").trim();
+    if (!prompt) return res.status(400).json({ error: "dhon..! prompt gib korun..🫴" });
 
-app.get('/mj', async (req, res) => {
-  const tempFiles = [];
-  await autoCleanupFolder();
+    const apiUrl = `https://api.oculux.xyz/api/mj-proxy-pub?prompt=${encodeURIComponent(
+      prompt
+    )}&usePolling=false`;
 
-  const prompt = req.query.prompt;
-  if (!prompt) {
-    return res.status(400).json({ error: 'Prompt is required' });
-  }
+    const upstream = await axios.get(apiUrl, { responseType: "arraybuffer", timeout: 180000, validateStatus: null });
+    const upstreamType = (upstream.headers["content-type"] || "").toLowerCase();
 
-  const apiUrl = `https://api.oculux.xyz/api/mj-proxy-pub?prompt=${encodeURIComponent(prompt)}&usePolling=false`;
-
-  try {
-    const response = await axios.get(apiUrl, { timeout: 180000 });
-    const urls = response.data.results;
-
-    if (!urls || urls.length === 0) {
-      return res.status(500).json({ error: 'API failed to generate images' });
+    if (upstreamType.startsWith("image/")) {
+      res.setHeader("content-type", upstreamType);
+      res.setHeader("cache-control", "no-cache, no-store, must-revalidate");
+      return res.send(Buffer.from(upstream.data));
     }
 
-    const buffers = [];
-    for (let i = 0; i < urls.length; i++) {
-      const res = await axios.get(urls[i], { responseType: 'arraybuffer' });
-      const filePath = path.join(imagesDir, `mj_${i + 1}_${Date.now()}.png`);
-      fs.writeFileSync(filePath, res.data);
-      tempFiles.push(filePath);
-      buffers.push(Buffer.from(res.data));
-    }
-
-    const dims = await Promise.all(buffers.map((b) => sharp(b).metadata()));
-    const gridWidth = dims[0].width * 2;
-    const gridHeight = dims[0].height * 2;
-    const cellWidth = dims[0].width;
-    const cellHeight = dims[0].height;
-
-    const gridBuffer = await sharp({
-      create: {
-        width: gridWidth,
-        height: gridHeight,
-        channels: 3,
-        background: { r: 0, g: 0, b: 0 },
-      },
-    })
-      .composite(
-        buffers.map((input, i) => ({
-          input,
-          left: (i % 2) * cellWidth,
-          top: Math.floor(i / 2) * cellHeight,
-        }))
-      )
-      .png()
-      .toBuffer();
-
-    const gridPath = path.join(imagesDir, `grid_${Date.now()}.png`);
-    fs.writeFileSync(gridPath, gridBuffer);
-    tempFiles.push(gridPath);
-
-    res.set('Content-Type', 'image/png');
-    res.send(gridBuffer);
-
-    setTimeout(() => cleanupFiles(tempFiles), 30 * 60 * 1000);
-  } catch (e) {
-    setTimeout(() => cleanupFiles(tempFiles), 30 * 60 * 1000);
-    res.status(500).json({ error: 'An error occurred while generating images' });
-  }
-});
-
-app.get('/mj/select/:index', async (req, res) => {
-  const index = parseInt(req.params.index);
-  const files = fs.readdirSync(imagesDir).filter(f => f.startsWith('mj_') && f.endsWith('.png'));
-
-  if (isNaN(index) || index < 1 || index > files.length) {
-    return res.status(400).json({ error: 'Invalid selection. Choose a number between 1 and 4' });
-  }
-
-  const selectedFile = files[index - 1];
-  const filePath = path.join(imagesDir, selectedFile);
-  const finalPath = path.join(imagesDir, `final_${Date.now()}.png`);
-
-  try {
-    fs.copyFileSync(filePath, finalPath);
-    res.set('Content-Type', 'image/png');
-    res.sendFile(finalPath, (err) => {
-      if (!err) {
-        setTimeout(() => cleanupFiles([finalPath]), 30 * 60 * 1000);
+    if (upstreamType.includes("application/json") || upstreamType.includes("text/json") || upstreamType.includes("application/problem+json")) {
+      let json;
+      try {
+        json = JSON.parse(Buffer.from(upstream.data).toString("utf8"));
+      } catch (e) {
+        return res.status(500).json({ error: "Failed to parse upstream JSON" });
       }
-    });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to send the selected image' });
+
+      const candidate =
+        (Array.isArray(json.results) && json.results.length && json.results[0]) ||
+        json.url ||
+        json.image ||
+        json.data ||
+        null;
+
+      if (!candidate) return res.status(502).json({ error: "Upstream returned JSON but no image URL found" });
+
+      const imageResp = await axios.get(candidate, { responseType: "stream", timeout: 180000, validateStatus: null });
+      const imageType = (imageResp.headers["content-type"] || "application/octet-stream").toLowerCase();
+      res.setHeader("content-type", imageType);
+      res.setHeader("cache-control", "no-cache, no-store, must-revalidate");
+      await pipeline(imageResp.data, res);
+      return;
+    }
+
+    return res.status(502).json({ error: "Unsupported upstream response", headers: upstream.headers });
+  } catch (err) {
+    return res.status(500).json({ error: "dhon er midjourney error", message: err.message });
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {});
