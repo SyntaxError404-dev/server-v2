@@ -9,13 +9,13 @@ const PORT = 3000;
 
 app.get("/gen", async (req, res) => {
   const prompt = req.query.prompt;
-  if (!prompt) return res.status(400).send("dhon..! prompt gib korun..🫴");
+  if (!prompt) return res.status(400).send("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀dhon..! prompt gib korun..🫴");
 
   try {
     const apiUrl = `https://api.oculux.xyz/api/mj-proxy-pub?prompt=${encodeURIComponent(prompt)}&usePolling=false`;
     const response = await axios.get(apiUrl, { timeout: 180000 });
     const urls = response.data.results;
-    if (!urls || urls.length !== 4) return res.status(500).send("dhon error..ahh..");
+    if (!urls || urls.length !== 4) return res.status(500).send("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀dhon error..ahh..");
 
     const buffers = [];
     for (let i = 0; i < 4; i++) {
